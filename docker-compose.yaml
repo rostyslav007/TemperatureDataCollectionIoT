@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret_password
+      POSTGRES_DB: temperature
+    volumes:
+      - ./db_data:/var/lib/postgresql/data  # Persist data
+    ports:
+      - "5433:5432"  # Expose the DB for local access
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+  server:
+    build:
+      context: .
+      dockerfile: docker/db_listener/Dockerfile
+    env_file:
+      - ./env/.env.db
+    depends_on:
+      - db
+    ports:
+      - "5500:5000"
+    command: python listener.py  # Run the listener script
+  mqtt_collector:
+    build:
+      context: .
+      dockerfile: docker/mqtt_collector/Dockerfile
+    env_file:
+      - ./env/.env.mqtt
+    environment:
+      - PY_SERVER_ENDPOINT=http://server:5000/store
+    command: python collector.py
+  site:
+    build:
+      context: .
+      dockerfile: docker/site/Dockerfile
+    env_file:
+      - env/.env.node
+    ports:
+      - "3000:3000"
+    command: node server.js
